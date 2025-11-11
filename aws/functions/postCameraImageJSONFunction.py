@@ -1,7 +1,5 @@
 import json
 import boto3
-import os
-from datetime import datetime
 
 # Initialize DynamoDB resource
 dynamodb = boto3.resource('dynamodb')
@@ -31,7 +29,7 @@ def lambda_handler(event, context):
         else:
             status = "in-use"  
         
-        response = table.update_item(
+        table.update_item(
             Key={'machineID': machine_id},
             UpdateExpression="SET #s = :status",
             ExpressionAttributeNames={

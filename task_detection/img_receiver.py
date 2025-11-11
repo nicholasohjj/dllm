@@ -43,7 +43,7 @@ def on_message(client, userdata, message):
     
     if message.topic == "/cam/room" :
         # print("Received image from room camera")
-        file_name = write_image_to_process(message.payload)
+        write_image_to_process(message.payload)
         # update_image_function(app, file_name)
 
     ## add more elif statements for other topics

@@ -2,7 +2,6 @@ import json
 import boto3
 import joblib
 import pandas as pd
-from sklearn.tree import DecisionTreeClassifier
 
 s3 = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')

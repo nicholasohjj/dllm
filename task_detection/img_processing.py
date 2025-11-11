@@ -5,9 +5,19 @@
 import argparse
 import sys
 import threading
-sys.path.append('yolov7')
 import gc
 import os
+import torch
+import cv2
+from torchvision import transforms
+import numpy as np
+import json
+
+sys.path.append('yolov7')
+from utils.datasets import letterbox
+from utils.general import non_max_suppression_kpt
+from utils.plots import output_to_keypoint, plot_skeleton_kpts
+
 gc.enable()
 # Initialize parser
 parser = argparse.ArgumentParser(description="Process the filename from command line arguments.")
@@ -21,17 +31,6 @@ path_input_image = 'images/' + input_image
 # path_input_image = input_image 
 path_output_json = 'json_output/' + file_name + '.json'
 path_output_image = 'images_output/' + file_name + '_out.' + file_format
-
-import torch
-import cv2
-from torchvision import transforms
-import numpy as np
-from utils.datasets import letterbox
-from utils.general import non_max_suppression_kpt
-from utils.plots import output_to_keypoint, plot_skeleton_kpts
-import json
-import gc
-
 
 def rotate_image(filepath, rotation_type):
     # Read the image from the file path

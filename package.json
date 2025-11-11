@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "lint": "eslint . --ext .js,.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check": "bun run lint && bun run test"
   },
   "devDependencies": {
     "eslint": "^8.57.0",

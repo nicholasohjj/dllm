@@ -1,10 +1,10 @@
 import json
 import joblib
-from sklearn.tree import DecisionTreeClassifier
 import pandas as pd
 import numpy as np
 import sys
 import argparse
+import requests
 
 COllECT_ANGLE_THRESHOLD = 150
 
@@ -158,8 +158,6 @@ if is_person and is_collect:
 states_df.to_csv("machine_state.csv", index_label="machine_id")
 print("final_state", states_df)
 ### Send data to AWS Lambda function
-import requests
-import json
 
 # Replace with your Lambda function URL
 lambda_url = 'https://v6uenqf62ikboz5ejqojqkstp40rgawe.lambda-url.ap-southeast-1.on.aws/'  

@@ -1,5 +1,4 @@
 import importlib
-import json
 from datetime import datetime, timedelta
 
 import boto3

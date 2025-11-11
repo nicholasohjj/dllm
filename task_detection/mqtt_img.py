@@ -1,11 +1,9 @@
 import tkinter as tk
 from tkinter import Label
 from PIL import Image, ImageTk
-from time import sleep
 import time
 import paho.mqtt.client as mqtt
 import threading
-import os
 
 class ImageDisplayApp:
     def __init__(self, root, image_path):
