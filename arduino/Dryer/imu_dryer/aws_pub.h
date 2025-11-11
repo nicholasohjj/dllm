@@ -18,6 +18,7 @@ int counter = 0;
 char vibrationTopic[] = "laundry/vibration";  // Topic to publish sensor data to
 char gyroTopic[] = "laundry/gyro";  // Topic to publish sensor data to
 char accelerationTopic[] = "laundry/acceleration";  // Topic to publish sensor data to
+char heartbeatTopic[] = "laundry/heartbeat";
 
 // AWS IoT credentials
 const char* aws_endpoint = "ap9dul9m9yrmt-ats.iot.ap-southeast-1.amazonaws.com";  // AWS IoT Core endpoint
@@ -31,6 +32,13 @@ PubSubClient client(net);
 const char* ntpServer = "pool.ntp.org";
 const long  gmtOffset_sec = 8 * 3600;  // Singapore timezone
 const int   daylightOffset_sec = 0;
+
+const unsigned long WIFI_RETRY_DELAY_MS = 500;
+const uint8_t WIFI_RETRY_BUDGET = 10;
+const uint8_t AWS_RETRY_BUDGET = 5;
+const unsigned long MQTT_HEARTBEAT_INTERVAL_MS = 25000;
+
+unsigned long lastHeartbeatMs = 0;
 
 void network_conf() {
   Serial.println("Connecting to network: ");
@@ -58,23 +66,38 @@ void network_conf() {
 }
 
 // Connect to AWS IoT Core
-void connectAWS() {
+bool connectAWS(uint8_t maxAttempts = AWS_RETRY_BUDGET) {
+  if (client.connected()) {
+    return true;
+  }
+
   net.setCACert(amazon_root_ca);
   net.setCertificate(certificate_pem_crt);
   net.setPrivateKey(private_pem_key);
 
   client.setServer(aws_endpoint, port);
+  client.setKeepAlive(45);
 
-  while (!client.connected()) {
+  uint8_t attempts = 0;
+  while (!client.connected() && attempts < maxAttempts) {
     Serial.print("Connecting to AWS IoT Core...");
-    if (client.connect("ESP32Client")) {
+    if (client.connect("ESP32DryerClient")) {
       Serial.println("Connected to AWS IoT Core!");
+      lastHeartbeatMs = millis();
+      return true;
     } else {
       Serial.print("Failed, rc=");
       Serial.println(client.state());
+      attempts++;
       delay(2000);
     }
   }
+
+  if (!client.connected()) {
+    Serial.println("Failed to connect to AWS IoT Core within retry budget.");
+    return false;
+  }
+  return true;
 }
 
 // Function to get the current time
@@ -90,26 +113,54 @@ String getFormattedTime() {
 }
 
 void publish_res(int vibration) {
+  if (!client.connected()) {
+    Serial.println("MQTT publish skipped: client not connected.");
+    return;
+  }
+
   String timestamp_value = getFormattedTime();
   String msg = String("{\"device_id\":\"ESP32_1\", \"machine_id\":\"RVREB-D1\", \"vibration\":") + vibration + ", \"timestamp_value\":\"" + timestamp_value + "\"}";
   client.publish(vibrationTopic, msg.c_str());
   Serial.println(msg);
+  lastHeartbeatMs = millis();
 }
 
-void setup_wifi() {
-  if (WiFi.status() == WL_CONNECTED) {  //if we are connected to Eduroam network
-    counter = 0;                        //reset counter
-    Serial.println("Wifi is still connected with IP: ");
-    Serial.println(WiFi.localIP());            //inform user about his IP address
-  } else if (WiFi.status() != WL_CONNECTED) {  //if we lost connection, retry
-    WiFi.begin(ssid);
+bool setup_wifi(uint8_t maxAttempts = WIFI_RETRY_BUDGET) {
+  if (WiFi.status() == WL_CONNECTED) {
+    counter = 0;
+    Serial.println("WiFi already connected with IP:");
+    Serial.println(WiFi.localIP());
+    return true;
   }
-  while (WiFi.status() != WL_CONNECTED) {  //during lost connection, print dots
-    delay(500);
+
+  WiFi.begin(ssid);
+  uint8_t attempts = 0;
+  while (WiFi.status() != WL_CONNECTED && attempts < maxAttempts) {
+    delay(WIFI_RETRY_DELAY_MS);
     Serial.print(".");
-    counter++;
-    if (counter >= 60) {  //30 seconds timeout - reset board
-      ESP.restart();
+    attempts++;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi reconnect budget exhausted.");
+    return false;
+  }
+
+  Serial.println("");
+  Serial.println("WiFi reconnected");
+  Serial.println("IP address set: ");
+  Serial.println(WiFi.localIP());
+  counter = 0;
+  return true;
+}
+
+void maintainAwsConnection() {
+  if (client.connected()) {
+    client.loop();
+    const unsigned long now = millis();
+    if (now - lastHeartbeatMs >= MQTT_HEARTBEAT_INTERVAL_MS) {
+      client.publish(heartbeatTopic, "{\"status\":\"alive\"}");
+      lastHeartbeatMs = now;
     }
   }
 }

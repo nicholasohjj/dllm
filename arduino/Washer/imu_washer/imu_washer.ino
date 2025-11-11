@@ -8,9 +8,12 @@
 #include <aws_pub.h>
 #include <mqtt.h>
 #include <sleep.h>
+#include "../common/imu_calibration.h"
 
 Eloquent::ML::Port::RandomForest classifier;
 
+const IMUCalibration &imuCalibration =
+    getIMUCalibration(MachineVariant::Washer);
 
 int pred = 0;
 int preds[30] = {};
@@ -85,14 +88,22 @@ void get_acc_gyro_readings() {
   I2Cread(MPU9250_ADDRESS, 0x3B, 14, Buf);
 
   // Convertir registros acelerometro
-  int16_t ax = -(Buf[0] << 8 | Buf[1]);
-  int16_t ay = -(Buf[2] << 8 | Buf[3]);
-  int16_t az = Buf[4] << 8 | Buf[5];
+  int16_t ax_raw = -(Buf[0] << 8 | Buf[1]);
+  int16_t ay_raw = -(Buf[2] << 8 | Buf[3]);
+  int16_t az_raw = Buf[4] << 8 | Buf[5];
+
+  int16_t ax = applyAxisCalibration(ax_raw, imuCalibration.accel[0]);
+  int16_t ay = applyAxisCalibration(ay_raw, imuCalibration.accel[1]);
+  int16_t az = applyAxisCalibration(az_raw, imuCalibration.accel[2]);
 
   // Convertir registros giroscopio
-  int16_t gx = -(Buf[8] << 8 | Buf[9]);
-  int16_t gy = -(Buf[10] << 8 | Buf[11]);
-  int16_t gz = Buf[12] << 8 | Buf[13];
+  int16_t gx_raw = -(Buf[8] << 8 | Buf[9]);
+  int16_t gy_raw = -(Buf[10] << 8 | Buf[11]);
+  int16_t gz_raw = Buf[12] << 8 | Buf[13];
+
+  int16_t gx = applyAxisCalibration(gx_raw, imuCalibration.gyro[0]);
+  int16_t gy = applyAxisCalibration(gy_raw, imuCalibration.gyro[1]);
+  int16_t gz = applyAxisCalibration(gz_raw, imuCalibration.gyro[2]);
 
   print_acc(ax, ay, az);
   pred_washer_status(ax, ay, az);
