@@ -25,7 +25,7 @@ def test_connect_function_adds_connection_with_ttl(websocket_table):
 
     assert response["statusCode"] == 200
     item = websocket_table.get_item(Key={"connectionId": "abc123"})["Item"]
-    expires_at = datetime.fromtimestamp(item["ExpirationTime"])
+    expires_at = datetime.fromtimestamp(int(item["ExpirationTime"]))
     assert expires_at > datetime.utcnow()
 
 
