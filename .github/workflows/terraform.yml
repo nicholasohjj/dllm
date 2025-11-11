@@ -1,79 +1,64 @@
 name: Terraform
 
 on:
-  workflow_dispatch:  # Allows manual triggering from the Actions tab in GitHub
+  workflow_dispatch:
 
 jobs:
+  prechecks:
+    name: CI Gate
+    uses: ./.github/workflows/test.yml
+    secrets: inherit
+
   terraform:
+    name: Terraform Plan & Apply
     runs-on: ubuntu-latest
+    needs: prechecks
 
     permissions:
-      contents: read  # required to fetch repository contents
-      id-token: write # required for OIDC federation (alternative for AWS credentials if configured)
-      pull-requests: write # allows PR comment creation
+      contents: read
+      id-token: write
+      pull-requests: write
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
 
     steps:
-      # Step 1: Checkout the repository
-      - name: Checkout Repository
-        uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # Step 2: Configure AWS credentials using the AWS CLI (OIDC alternative recommended)
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # Step 3: Set up Terraform
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v1
+        uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.0.0
+          terraform_version: 1.6.6
 
-      # Step 4: Initialize Terraform with backend configuration
       - name: Terraform Init
         run: terraform init
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
 
-      # Step 5: Optional - Refresh state to sync with actual AWS resources (usually only needed in specific cases)
-      - name: Terraform Refresh
-        run: terraform refresh
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
-
-      # Step 6: Terraform Plan - Output to a file and create PR comment with plan summary
       - name: Terraform Plan
         run: terraform plan -out=tfplan
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
 
-      # Step 7: Comment Terraform Plan output on Pull Request (only on pull requests)
       - name: Comment Plan on PR
         if: github.event_name == 'pull_request'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           terraform show -json tfplan | jq -r '.resource_changes[] | "Resource: \(.type) \(.name) Action: \(.change.actions[])"' > plan_summary.txt
-          gh pr comment ${{ github.event.pull_request.number }} --body "### Terraform Plan Summary\n\`\`\`\n$(cat plan_summary.txt)\n\`\`\`"
+          gh pr comment ${{ github.event.pull_request.number }} --body "### Terraform Plan Summary\n```\n$(cat plan_summary.txt)\n```"
 
-      # Step 8: Terraform Apply - Only on pushes to `main` branch (requires manual approval or additional protection for `main` branch)
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main'
         run: terraform apply -auto-approve tfplan
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
 
-      # Step 9: Cleanup Plan File (optional but recommended for security and organization)
       - name: Cleanup Plan File
         if: always()
         run: rm -f tfplan plan_summary.txt
+

@@ -6,11 +6,12 @@ on:
       - main
       - master
   pull_request:
+  workflow_call:
 
 jobs:
-  test:
+  python-checks:
+    name: Python Lint & Tests
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,12 +22,25 @@ jobs:
           python-version: "3.11"
 
       - name: Install Python dependencies
-        run: pip install -r requirements-dev.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint Python code
+        run: |
+          ruff check aws task_detection tests/python
 
       - name: Run Python tests
         run: pytest tests/python
 
-      - name: Set up Node
+  node-checks:
+    name: Node.js Lint & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -34,6 +48,31 @@ jobs:
       - name: Install Node dependencies
         run: npm install
 
-      - name: Run Node tests
+      - name: Lint Node.js code
+        run: npm run lint
+
+      - name: Run Node.js tests
         run: npm test
 
+  cpp-checks:
+    name: C/C++ Static Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cppcheck
+
+      - name: Run cppcheck
+        run: |
+          cppcheck \
+            --enable=all \
+            --inconclusive \
+            --force \
+            --std=c++17 \
+            --suppress=missingIncludeSystem \
+            --error-exitcode=1 \
+            arduino esp32-camera
