@@ -4,25 +4,20 @@ import os
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
-# Initialize clients for DynamoDB and S3
 dynamodb = boto3.resource('dynamodb')
 s3 = boto3.client('s3')
 
-# Retrieve environment variables
 TABLE_NAME = os.environ.get('VIBRATION_DATA_TABLE')
 BUCKET_NAME = os.environ.get('ARCHIVE_BUCKET_NAME')
-S3_KEY = os.environ.get('ARCHIVE_S3_KEY', 'archive/oldData.json')  # Default key if not provided
+S3_KEY = os.environ.get('ARCHIVE_S3_KEY', 'archive/oldData.json') 
 
 def lambda_handler(event, context):
-    # Initialize DynamoDB table
     table = dynamodb.Table(TABLE_NAME)
     
-    # Calculate the cutoff time in UTC (10 minutes ago)
     current_time_utc = datetime.now(timezone.utc)
     cutoff_time_utc = current_time_utc - timedelta(minutes=10)
     cutoff_iso = cutoff_time_utc.strftime('%Y-%m-%dT%H:%M:%SZ')  # ISO 8601 format
     
-    # Scan items with a FilterExpression for items older than the cutoff time
     response = table.scan(
         FilterExpression='#ts < :cutoff_time',
         ExpressionAttributeNames={'#ts': 'timestamp_value'},
@@ -38,7 +33,6 @@ def lambda_handler(event, context):
             'body': json.dumps('No data found for archiving')
         }
     
-    # Retrieve existing data from S3 (if any)
     try:
         s3_response = s3.get_object(Bucket=BUCKET_NAME, Key=S3_KEY)
         existing_data = json.loads(s3_response['Body'].read().decode('utf-8'))
@@ -72,7 +66,6 @@ def lambda_handler(event, context):
         'body': json.dumps(f"Archived {total_archived} items to S3 and removed from DynamoDB.")
     }
 
-# Custom encoder for handling Decimal type in DynamoDB items
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, Decimal):

@@ -1,11 +1,9 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient, BatchWriteCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 
-// Initialize DynamoDB client
 const client = new DynamoDBClient({});
 const ddbDocClient = DynamoDBDocumentClient.from(client);
 
-// Function to generate machines with all machines set to "available"
 const generateMachines = () => {
   const washers = Array.from({ length: 8 }, (_, i) => {
     const washerNumber = 8 - i;
@@ -16,7 +14,7 @@ const generateMachines = () => {
       machineID: machineID,
       shortName: shortName,
       type: "washer",
-      status: "available",  // All machines set to "available"
+      status: "available",
       timeRemaining: isFunctional ? 0 : 0,
       position: { x: 20, y: 20 + i * 15 }
     };
@@ -31,7 +29,7 @@ const generateMachines = () => {
       machineID: machineID,
       shortName: shortName,
       type: "dryer",
-      status: "available",  // All machines set to "available"
+      status: "available",
       timeRemaining: isFunctional ? 0 : 0,
       position: { x: 80, y: 20 + i * 20 }
     };
@@ -52,22 +50,20 @@ const batchWriteMachines = async (machines) => {
   }
 
   for (const batch of batches) {
-    const tableName = process.env.MACHINE_STATUS_TABLE;  // Retrieve table name from environment variable
+    const tableName = process.env.MACHINE_STATUS_TABLE; 
     const batchWriteCommand = new BatchWriteCommand({
       RequestItems: {
-        [tableName]: batch  // Use the table name from the environment variable
+        [tableName]: batch 
       }
     });
     await ddbDocClient.send(batchWriteCommand);
   }
 };
 
-// Lambda handler to insert the machines into DynamoDB
 export const handler = async () => {
   const machines = generateMachines();
   
   try {
-    // Use batch write for inserting machines
     await batchWriteMachines(machines);
     return {
       statusCode: 200,

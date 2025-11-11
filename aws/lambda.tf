@@ -1,5 +1,4 @@
-# Archive Files for Lambda Functions
-# Each function is zipped and stored as an archived file, ready for deployment.
+# Files for Lambda Functions
 data "archive_file" "archiveOldDataFunction" {
   type        = "zip"
   source_file = "functions/archiveOldDataFunction.py"
@@ -51,7 +50,6 @@ data "archive_file" "shuffle_machine_status" {
 }
 
 # Lambda Functions
-# Each Lambda function resource references an archive file for deployment
 
 # Seed Machine Function
 resource "aws_lambda_function" "seedMachineFunction" {

@@ -11,7 +11,6 @@ def lambda_handler(event, context):
     ttl_duration = 1800  # 30 minutes
     expiration_time = int(time.time()) + ttl_duration
 
-    # Add connection ID to DynamoDB with TTL
     table.put_item(
         Item={
             'connectionId': connection_id,
