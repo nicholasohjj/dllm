@@ -125,6 +125,17 @@ void publish_res(int vibration) {
   lastHeartbeatMs = millis();
 }
 
+void publish_res_json(String jsonMsg) {
+  if (!client.connected()) {
+    Serial.println("MQTT publish skipped: client not connected.");
+    return;
+  }
+
+  client.publish(vibrationTopic, jsonMsg.c_str());
+  Serial.println("Published JSON: " + jsonMsg);
+  lastHeartbeatMs = millis();
+}
+
 bool setup_wifi(uint8_t maxAttempts = WIFI_RETRY_BUDGET) {
   if (WiFi.status() == WL_CONNECTED) {
     counter = 0;

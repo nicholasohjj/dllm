@@ -1,12 +1,7 @@
-import os
-
 import boto3
 
-_REGION = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-1"
-_TABLE_NAME = os.getenv("MACHINE_STATUS_TABLE", "MachineStatusTable")
-
-dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-table = dynamodb.Table(_TABLE_NAME)
+dynamodb = boto3.resource('dynamodb')
+table = dynamodb.Table('MachineStatusTable')
 
 statuss = ["available", "in-use", "complete"]
 

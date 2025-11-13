@@ -80,3 +80,33 @@ resource "aws_dynamodb_table" "CameraImageJSON" {
   }
   
 }
+
+# New table for processed camera detections (from YOLOv7 + classification)
+resource "aws_dynamodb_table" "CameraDetectionData" {
+  name         = "CameraDetectionData"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "machine_id"
+  range_key    = "timestamp"
+
+  attribute {
+    name = "machine_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "timestamp"
+    type = "N"
+  }
+
+  ttl {
+    attribute_name = "ttl"
+    enabled        = true
+  }
+
+  tags = {
+    Name        = "CameraDetectionData"
+    Environment = "production"
+    Project     = "DLLM"
+    Owner       = "Nicholas"
+  }
+}
