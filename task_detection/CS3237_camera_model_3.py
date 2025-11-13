@@ -139,7 +139,7 @@ json_data = {
     "is_walking": is_walking
 }
 
-print(f"\nSending camera detection data to AWS:")
+print("\nSending camera detection data to AWS:")
 print(json.dumps(json_data, indent=2))
 
 # Send POST request

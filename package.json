@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.470.0",
+    "@aws-sdk/client-lambda": "^3.470.0",
     "@aws-sdk/lib-dynamodb": "^3.470.0"
   },
   "packageManager": "bun@1.1.0"

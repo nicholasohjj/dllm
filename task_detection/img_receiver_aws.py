@@ -11,7 +11,6 @@ import time
 import subprocess
 import threading
 import gc
-from datetime import datetime
 import paho.mqtt.client as mqtt
 
 # AWS IoT imports (requires: pip install awsiotsdk)
@@ -61,7 +60,7 @@ class CameraDataProcessor:
         try:
             # Check if certificate files exist
             if not all(os.path.exists(p) for p in [AWS_CERT_PATH, AWS_KEY_PATH, AWS_CA_PATH]):
-                print(f"ERROR: AWS IoT certificates not found. Please place them in:")
+                print("ERROR: AWS IoT certificates not found. Please place them in:")
                 print(f"  - {AWS_CERT_PATH}")
                 print(f"  - {AWS_KEY_PATH}")
                 print(f"  - {AWS_CA_PATH}")
@@ -195,14 +194,13 @@ class CameraDataProcessor:
             # Import the get_prediction function
             import sys
             sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-            from CS3237_camera_model_3 import get_prediction, calculate_angle
+            from CS3237_camera_model_3 import get_prediction
             
             prediction = get_prediction(keypoints)
             
             is_person = prediction[0][0] == 1
             is_washer = prediction[0][1] == 0
             is_dryer = prediction[0][1] == 1
-            is_walking = prediction[0][1] == 2
             is_collecting = prediction[0][2] == 1
             
             if not is_person:

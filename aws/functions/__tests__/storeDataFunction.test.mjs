@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const sendMock = vi.fn();
+const lambdaSendMock = vi.fn();
 
 vi.mock("@aws-sdk/client-dynamodb", () => {
   return {
@@ -18,51 +19,67 @@ vi.mock("@aws-sdk/lib-dynamodb", () => {
   };
 });
 
+vi.mock("@aws-sdk/client-lambda", () => {
+  return {
+    LambdaClient: vi.fn(() => ({ send: lambdaSendMock })),
+    InvokeCommand: vi.fn((input) => ({ input, name: "InvokeCommand" })),
+  };
+});
+
 describe("storeDataFunction handler", () => {
   beforeEach(() => {
     sendMock.mockReset();
+    lambdaSendMock.mockReset();
     process.env.DYNAMODB_TABLE = "TelemetryTable";
-    process.env.MACHINE_STATUS_TABLE = "MachineStatusTable";
+    process.env.STATE_MACHINE_FUNCTION = "updateMachineStateFunction";
   });
 
-  it("stores vibration payload and updates machine status when vibration is 1", async () => {
-    sendMock.mockResolvedValueOnce({}).mockResolvedValueOnce({});
+  it("stores vibration payload and invokes state machine function when vibration is 1", async () => {
+    sendMock.mockResolvedValueOnce({});
+    lambdaSendMock.mockResolvedValueOnce({});
 
     const { handler } = await import("../storeDataFunction.mjs");
     const event = { machine_id: "RVREB-W1", vibration: 1 };
     const response = await handler(event);
 
     expect(response.statusCode).toBe(200);
-    expect(sendMock).toHaveBeenCalledTimes(2);
+    expect(sendMock).toHaveBeenCalledTimes(1);
     expect(sendMock.mock.calls[0][0]).toEqual(
       expect.objectContaining({
         name: "PutCommand",
         input: expect.objectContaining({
           TableName: "TelemetryTable",
-          Item: event,
+          Item: expect.objectContaining({
+            machine_id: "RVREB-W1",
+            vibration: 1,
+          }),
         }),
       })
     );
-    expect(sendMock.mock.calls[1][0]).toEqual(
+    expect(lambdaSendMock).toHaveBeenCalledTimes(1);
+    expect(lambdaSendMock.mock.calls[0][0]).toEqual(
       expect.objectContaining({
-        name: "UpdateCommand",
+        name: "InvokeCommand",
         input: expect.objectContaining({
-          TableName: "MachineStatusTable",
-          Key: { machineID: "RVREB-W1" },
+          FunctionName: "updateMachineStateFunction",
+          InvocationType: "Event",
         }),
       })
     );
   });
 
-  it("skips status update when vibration is 0", async () => {
+  it("stores vibration payload and invokes state machine function when vibration is 0", async () => {
     sendMock.mockResolvedValueOnce({});
+    lambdaSendMock.mockResolvedValueOnce({});
 
     const { handler } = await import("../storeDataFunction.mjs");
     const event = { machine_id: "RVREB-W1", vibration: 0 };
-    await handler(event);
+    const response = await handler(event);
 
+    expect(response.statusCode).toBe(200);
     expect(sendMock).toHaveBeenCalledTimes(1);
     expect(sendMock.mock.calls[0][0].name).toBe("PutCommand");
+    expect(lambdaSendMock).toHaveBeenCalledTimes(1);
   });
 });
 

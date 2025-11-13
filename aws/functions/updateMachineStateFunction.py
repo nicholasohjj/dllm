@@ -29,7 +29,6 @@ def lambda_handler(event, context):
     # Get table names from environment
     machine_status_table_name = os.getenv('MACHINE_STATUS_TABLE', 'MachineStatusTable')
     camera_table_name = os.getenv('CAMERA_DETECTION_TABLE', 'CameraDetectionData')
-    vibration_table_name = os.getenv('VIBRATION_DATA_TABLE', 'VibrationData')
     
     machine_status_table = dynamodb.Table(machine_status_table_name)
     camera_table = dynamodb.Table(camera_table_name)
