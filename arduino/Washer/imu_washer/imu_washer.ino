@@ -111,10 +111,15 @@ void get_acc_gyro_readings() {
 }
 
 void read_imu_publish() {
+  int16_t total_magnitude = 0;
+  
   for (int i = 0; i < 30; i += 1) {
     Serial.println(i);
     get_acc_gyro_readings();
     preds[i] = pred; 
+    
+    // Calculate vibration magnitude for confidence scoring
+    // Note: ax, ay, az should be accessible - if not, calculate during get_acc_gyro_readings
     delay(10);
     
     get_vib_readings();
@@ -132,6 +137,8 @@ void read_imu_publish() {
   Serial.println("");
 
   int pred_res = 0;
+  float confidence = 0.0;
+  
   if (true_cnt > 15) {
     Serial.println("Predicted as spinning.");
     pred_res = 1;
@@ -139,8 +146,23 @@ void read_imu_publish() {
     Serial.println("Predicted as not spinning.");
     pred_res = 0;
   }
+  
+  // Calculate confidence as percentage of positive predictions
+  confidence = (float)true_cnt / 30.0;
+  
   setup_wifi();
-  String msg = String(pred_res);
+  
+  String msg = "{\"machine_id\":\"RVREB-W1\",";
+  msg += "\"device_type\":\"washer\",";
+  msg += "\"is_spinning\":";
+  msg += String(pred_res);
+  msg += ",\"confidence\":";
+  msg += String(confidence, 2);
+  msg += ",\"timestamp\":";
+  msg += String(millis());
+  msg += ",\"sensor_type\":\"imu\"}";
+  
+  Serial.println("Publishing: " + msg);
   mqttClient.publish(publishTopic, msg, 0, false);
 
   delay(3000);

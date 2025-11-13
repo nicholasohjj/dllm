@@ -5,6 +5,7 @@ import numpy as np
 import sys
 import argparse
 import requests
+from datetime import datetime
 
 COllECT_ANGLE_THRESHOLD = 150
 
@@ -88,10 +89,6 @@ with open(input_json, 'r') as file:
     data = json.load(file)
 pose_keypoints = data.get("pose_keypoints_2d", [])
 
-states_df = pd.read_csv("machine_state.csv",index_col="machine_id")
-print("\nInitial State",states_df)
-
-
 if not pose_keypoints:
     print("Error: 'pose_keypoints_2d' data not found or is empty.")
     sys.exit()
@@ -110,70 +107,48 @@ print("dryer :", is_dryer)
 print("walking :", is_walking)
 print("collect :", is_collect)
 
-
-# machine_ids = ['RVREB-D6', 'RVREB-D1', 'RVREB-W6', 'RVREB-W1', 'RVREB-D4', 'RVREB-W3', 'RVREB-W8', 'RVREB-W4', 'RVREB-W5', 'RVREB-W2', 'RVREB-D5', 'RVREB-D2', 'RVREB-D3', 'RVREB-W7']
+# Determine device ID and type
 washer_id = 'RVREB-W1'
 dryer_id = 'RVREB-D1'
 device_id = washer_id if is_washer else dryer_id
-is_available = 0
-device_state = states_df.loc[device_id]
+device_type = 'washer' if is_washer else 'dryer'
 
-is_idle = device_state['is_idle']
-is_in_use = device_state['is_in_use']
-is_spin = device_state['is_spin']
-has_clothes = device_state['has_clothes']
-last_time_stamp = device_state['last_time_stamp']
-print("last_time_stamp: ", last_time_stamp)
-print("time_stamp: ", time_stamp)
+# Calculate confidence based on prediction
+# Higher confidence if person detected with clear bending action
+confidence = 0.8 if is_person and is_collect else 0.6 if is_person else 0.3
+### Send data to AWS Lambda function (processCameraDataFunction)
 
-# DF: is_idle, is_in_use, is_spin, has_clothes, last_time_stamp
-if is_person and is_collect:
-    if is_dryer: 
-        if is_idle and not has_clothes:
-            is_available = 0
-            states_df.loc[device_id] = [0, 1, 0, 1, time_stamp]
-        elif not is_idle:
-            last_time = pd.to_datetime(last_time_stamp)
-            current_time = pd.to_datetime(time_stamp)
-            if (current_time - last_time).total_seconds() > 1200: # time lapse of 20 minutes after using
-                is_available = 1
-                states_df.loc[device_id] = [1, 0, 0, 0, time_stamp]
-        else:
-            is_available = 0
-            states_df.loc[device_id] = [0, 1, 0, 1, time_stamp]
-    elif is_washer:  # to include vibration data
-        if is_idle: # from no one using to start using washing machine
-            is_available = 0
-            states_df.loc[device_id] = [0, 1, 0, 1, time_stamp]
-        elif not is_idle:
-            last_time = pd.to_datetime(last_time_stamp)
-            current_time = pd.to_datetime(time_stamp)
-            if (current_time - last_time).total_seconds() > 1200: # time lapse of 20 minutes after using
-                is_available = 1
-                states_df.loc[device_id] = [1, 0, 0, 0, time_stamp]
-        else:
-            is_available = 0
-            states_df.loc[device_id] = [0, 1, 0, 1, time_stamp]
-
-states_df.to_csv("machine_state.csv", index_label="machine_id")
-print("final_state", states_df)
-### Send data to AWS Lambda function
-
-# Replace with your Lambda function URL
+# Lambda function URL for camera data processing
 lambda_url = 'https://v6uenqf62ikboz5ejqojqkstp40rgawe.lambda-url.ap-southeast-1.on.aws/'  
 
-# JSON data to post
+# Prepare camera detection data for AWS
+# Convert timestamp to Unix timestamp
+timestamp_dt = datetime.strptime(time_stamp, '%Y%m%d-%H%M%S')
+unix_timestamp = timestamp_dt.timestamp()
+
 json_data = {
     "machine_id": device_id,
-    "available": str(is_available),    
+    "timestamp": unix_timestamp,
+    "device_type": device_type,
+    "event_type": "person_detected" if is_person else "no_detection",
+    "is_bending": is_collect,  # is_collect indicates bending/loading action
+    "confidence": confidence,
+    "sensor_type": "camera",
+    # Additional context
+    "is_person": is_person,
+    "is_walking": is_walking
 }
 
-print(json_data)
-# # Send POST request
-response = requests.post(lambda_url, json=json_data)
+print("\nSending camera detection data to AWS:")
+print(json.dumps(json_data, indent=2))
 
-# # Check response
-if response.status_code == 200:
-     print("Data posted successfully:", response.json())
-else:
-     print("Failed to post data:", response.text)
+# Send POST request
+try:
+    response = requests.post(lambda_url, json=json_data)
+    
+    if response.status_code == 200:
+        print("\n✓ Data posted successfully:", response.json())
+    else:
+        print(f"\n✗ Failed to post data (status {response.status_code}):", response.text)
+except Exception as e:
+    print(f"\n✗ Error sending data to AWS: {e}")

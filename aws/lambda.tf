@@ -192,11 +192,12 @@ resource "aws_lambda_function" "storeDataFunction" {
   filename         = data.archive_file.storeDataFunction.output_path
   source_code_hash = data.archive_file.storeDataFunction.output_base64sha256
   role             = aws_iam_role.storeDataRole.arn
+  timeout          = 30
 
   environment {
     variables = {
-      DYNAMODB_TABLE = "VibrationData",
-      MACHINE_STATUS_TABLE = "MachineStatusTable"
+      DYNAMODB_TABLE       = "VibrationData"
+      STATE_MACHINE_FUNCTION = aws_lambda_function.updateMachineStateFunction.function_name
     }
   }
 }
@@ -229,5 +230,63 @@ resource "aws_lambda_function" "shuffle_machine_status" {
     }
   }
   
+}
+
+# Archive files for new Lambda functions
+data "archive_file" "processCameraDataFunction" {
+  type        = "zip"
+  source_file = "functions/processCameraDataFunction.mjs"
+  output_path = "functions/processCameraDataFunction.zip"
+}
+
+data "archive_file" "updateMachineStateFunction" {
+  type        = "zip"
+  source_file = "functions/updateMachineStateFunction.py"
+  output_path = "functions/updateMachineStateFunction.zip"
+}
+
+# New Lambda: Process Camera Detection Data
+resource "aws_lambda_function" "processCameraDataFunction" {
+  function_name    = "processCameraDataFunction"
+  handler          = "processCameraDataFunction.handler"
+  runtime          = "nodejs20.x"
+  filename         = data.archive_file.processCameraDataFunction.output_path
+  source_code_hash = data.archive_file.processCameraDataFunction.output_base64sha256
+  role             = aws_iam_role.cameraDataRole.arn
+  timeout          = 30
+
+  tracing_config {
+    mode = "Active"
+  }
+
+  environment {
+    variables = {
+      CAMERA_DETECTION_TABLE = aws_dynamodb_table.CameraDetectionData.name
+      STATE_MACHINE_FUNCTION = aws_lambda_function.updateMachineStateFunction.function_name
+    }
+  }
+}
+
+# New Lambda: Update Machine State (Sensor Fusion)
+resource "aws_lambda_function" "updateMachineStateFunction" {
+  function_name    = "updateMachineStateFunction"
+  handler          = "updateMachineStateFunction.lambda_handler"
+  runtime          = "python3.12"
+  filename         = data.archive_file.updateMachineStateFunction.output_path
+  source_code_hash = data.archive_file.updateMachineStateFunction.output_base64sha256
+  role             = aws_iam_role.stateMachineRole.arn
+  timeout          = 60
+
+  tracing_config {
+    mode = "Active"
+  }
+
+  environment {
+    variables = {
+      MACHINE_STATUS_TABLE   = aws_dynamodb_table.MachineStatusTable.name
+      CAMERA_DETECTION_TABLE = aws_dynamodb_table.CameraDetectionData.name
+      VIBRATION_DATA_TABLE   = aws_dynamodb_table.VibrationData.name
+    }
+  }
 }
 

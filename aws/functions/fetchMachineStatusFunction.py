@@ -3,11 +3,8 @@ import json
 import os
 from decimal import Decimal
 
-_REGION = os.getenv("AWS_REGION") or os.getenv("AWS_DEFAULT_REGION") or "us-east-1"
-_TABLE_NAME = os.getenv("MACHINE_STATUS_TABLE", "MachineStatusTable")
-
-dynamodb = boto3.resource("dynamodb", region_name=_REGION)
-machine_status_table = dynamodb.Table(_TABLE_NAME)
+dynamodb = boto3.resource('dynamodb')
+machine_status_table = dynamodb.Table(os.environ['MACHINE_STATUS_TABLE'])
 
 class DecimalEncoder(json.JSONEncoder):
     def default(self, obj):

@@ -61,4 +61,25 @@
     source_arn    = aws_iot_topic_rule.buttonRule.arn
   }
 
+  # New IoT Rule for Camera Detection Data
+  resource "aws_iot_topic_rule" "ProcessCameraDataRule" {
+    name        = "ProcessCameraData"
+    description = "Process camera detection data and update machine status"
+    enabled     = true
+    sql         = "SELECT * FROM 'laundry/camera'"
+    sql_version = "2016-03-23"
+
+    lambda {
+      function_arn = aws_lambda_function.processCameraDataFunction.arn
+    }
+  }
+
+  resource "aws_lambda_permission" "allow_iot_invoke_camera" {
+    statement_id  = "AllowIoTInvokeCamera"
+    action        = "lambda:InvokeFunction"
+    function_name = aws_lambda_function.processCameraDataFunction.function_name
+    principal     = "iot.amazonaws.com"
+    source_arn    = aws_iot_topic_rule.ProcessCameraDataRule.arn
+  }
+
   

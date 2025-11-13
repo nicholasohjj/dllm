@@ -320,3 +320,143 @@ resource "aws_iam_role_policy_attachment" "post_camera_image_update_machine_stat
   role       = aws_iam_role.postCameraImageJSONRole.name
   policy_arn = aws_iam_policy.post_camera_image_update_machine_status_policy.arn
 }
+
+# IAM Role for Camera Data Processing Function
+resource "aws_iam_role" "cameraDataRole" {
+  name = "CameraDataRole"
+  assume_role_policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Effect" : "Allow",
+        "Principal" : {
+          "Service" : "lambda.amazonaws.com"
+        },
+        "Action" : "sts:AssumeRole"
+      }
+    ]
+  })
+  path = "/service-role/"
+}
+
+# Policy for Camera Data Role: DynamoDB and Lambda invoke
+resource "aws_iam_policy" "camera_data_policy" {
+  name        = "CameraDataPolicy"
+  description = "Policy for camera data processing function"
+  policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "dynamodb:PutItem",
+          "dynamodb:Query",
+          "dynamodb:GetItem"
+        ],
+        "Resource" : "arn:aws:dynamodb:ap-southeast-1:149536472280:table/CameraDetectionData"
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "lambda:InvokeFunction"
+        ],
+        "Resource" : "arn:aws:lambda:ap-southeast-1:149536472280:function:updateMachineStateFunction"
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        "Resource" : "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "camera_data_role_attach" {
+  role       = aws_iam_role.cameraDataRole.name
+  policy_arn = aws_iam_policy.camera_data_policy.arn
+}
+
+# IAM Role for State Machine Function (Sensor Fusion)
+resource "aws_iam_role" "stateMachineRole" {
+  name = "StateMachineRole"
+  assume_role_policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Effect" : "Allow",
+        "Principal" : {
+          "Service" : "lambda.amazonaws.com"
+        },
+        "Action" : "sts:AssumeRole"
+      }
+    ]
+  })
+  path = "/service-role/"
+}
+
+# Policy for State Machine: Access all relevant DynamoDB tables
+resource "aws_iam_policy" "state_machine_policy" {
+  name        = "StateMachinePolicy"
+  description = "Policy for state machine sensor fusion function"
+  policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:Query",
+          "dynamodb:Scan"
+        ],
+        "Resource" : [
+          "arn:aws:dynamodb:ap-southeast-1:149536472280:table/MachineStatusTable",
+          "arn:aws:dynamodb:ap-southeast-1:149536472280:table/CameraDetectionData",
+          "arn:aws:dynamodb:ap-southeast-1:149536472280:table/VibrationData"
+        ]
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        "Resource" : "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "state_machine_role_attach" {
+  role       = aws_iam_role.stateMachineRole.name
+  policy_arn = aws_iam_policy.state_machine_policy.arn
+}
+
+# Update storeDataRole to allow Lambda invocation
+resource "aws_iam_policy" "store_data_lambda_invoke_policy" {
+  name        = "StoreDataLambdaInvokePolicy"
+  description = "Policy to allow storeDataFunction to invoke state machine"
+  policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "lambda:InvokeFunction"
+        ],
+        "Resource" : "arn:aws:lambda:ap-southeast-1:149536472280:function:updateMachineStateFunction"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "store_data_lambda_invoke_attach" {
+  role       = aws_iam_role.storeDataRole.name
+  policy_arn = aws_iam_policy.store_data_lambda_invoke_policy.arn
+}

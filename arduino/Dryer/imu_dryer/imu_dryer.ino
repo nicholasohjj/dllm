@@ -130,6 +130,8 @@ void read_imu_publish() {
   Serial.println("");
 
   int pred_res = 0;
+  float confidence = 0.0;
+  
   if (true_cnt > 15) {
     Serial.println("Predicted as drying.");
     pred_res = 1;
@@ -137,6 +139,9 @@ void read_imu_publish() {
     Serial.println("Predicted as idle.");
     pred_res = 0;
   }
+  
+  // Calculate confidence as percentage of positive predictions
+  confidence = (float)true_cnt / 30.0;
 
   if (!setup_wifi()) {
     Serial.println("Skipping publish: WiFi unavailable after retries.");
@@ -148,7 +153,18 @@ void read_imu_publish() {
     return;
   }
 
-  publish_res(pred_res);
+  String msg = "{\"machine_id\":\"RVREB-D1\",";
+  msg += "\"device_type\":\"dryer\",";
+  msg += "\"is_spinning\":";
+  msg += String(pred_res);
+  msg += ",\"confidence\":";
+  msg += String(confidence, 2);
+  msg += ",\"timestamp\":";
+  msg += String(millis());
+  msg += ",\"sensor_type\":\"imu\"}";
+  
+  Serial.println("Publishing: " + msg);
+  publish_res_json(msg);
   maintainAwsConnection();
   delay(3000);
 }

@@ -7,27 +7,36 @@ const ddbDocClient = DynamoDBDocumentClient.from(dynamoClient);
 const lambdaClient = new LambdaClient({});
 
 export const handler = async (event) => {
-  console.log("Received vibration event:", JSON.stringify(event));
+  console.log("Received camera detection event:", JSON.stringify(event));
   
-  const tableName = process.env.DYNAMODB_TABLE;
+  const cameraDataTable = process.env.CAMERA_DETECTION_TABLE || "CameraDetectionData";
   const stateMachineFunctionName = process.env.STATE_MACHINE_FUNCTION || "updateMachineStateFunction";
-
-  // Structure the event data to fit the DynamoDB table's schema
+  
+  // Add TTL (7 days from now)
+  const ttl = Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60);
+  
+  // Store camera detection in DynamoDB
   const params = {
-    TableName: tableName,
+    TableName: cameraDataTable,
     Item: {
-      ...event,
-      timestamp: event.timestamp || Date.now() / 1000
-    },
+      machine_id: event.machine_id,
+      timestamp: event.timestamp || Date.now() / 1000,
+      device_type: event.device_type || "washer",
+      event_type: event.event_type || "person_detected",
+      is_bending: event.is_bending || false,
+      confidence: event.confidence || 0,
+      sensor_type: event.sensor_type || "camera",
+      ttl: ttl
+    }
   };
-
+  
   try {
     await ddbDocClient.send(new PutCommand(params));
-    console.log("Vibration data stored successfully:", event);
-
+    console.log("Camera detection stored successfully");
+    
     // Invoke state machine function to process the event
     const stateMachinePayload = {
-      source: "imu",
+      source: "camera",
       data: event
     };
     
@@ -39,16 +48,17 @@ export const handler = async (event) => {
     
     await lambdaClient.send(new InvokeCommand(invokeParams));
     console.log("State machine function invoked");
-
+    
     return {
       statusCode: 200,
-      body: JSON.stringify({ message: "Data processed successfully" }),
+      body: JSON.stringify({ message: "Camera data processed successfully" })
     };
   } catch (error) {
-    console.error("Error processing data:", error);
+    console.error("Error processing camera data:", error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ message: "Failed to process data", error: error.message }),
+      body: JSON.stringify({ message: "Failed to process camera data", error: error.message })
     };
   }
 };
+
