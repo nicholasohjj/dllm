@@ -1,0 +1,31 @@
+@startuml
+[*] --> Available
+
+state Available
+state Loading
+state InUse
+state Finishing
+state ReadyToUnload
+
+' --- From AVAILABLE ---
+Available --> Loading : BendingDetected\n[conf > 0.7 && detections >= 2]
+Available --> Available : BendingDetected\n[detections == 1]\n// temporal consistency failed
+Available --> InUse : SpinningStarted (IMU)\n// missed camera, IMU fallback
+
+' --- From LOADING ---
+Loading --> InUse : SpinningStarted (IMU)\n// cross-validated
+Loading --> Available : Timeout(5min)\n[noSpinning]\n// user never started
+
+' --- From IN-USE ---
+InUse --> Finishing : SpinningStopped\n[t >= 25min]\n// normal cycle
+InUse --> InUse : SpinningStopped\n[t < 25min]\n// too short, reject
+InUse --> Available : BendingDetected\n[t >= 25min]\n// early unload
+
+' --- From FINISHING ---
+Finishing --> ReadyToUnload : Timeout(2min)\n// waiting for unload
+
+' --- From READY-TO-UNLOAD ---
+ReadyToUnload --> Available : BendingDetected\n// user unloading
+ReadyToUnload --> Available : Timeout(30min)\n// assume unloaded
+
+@enduml

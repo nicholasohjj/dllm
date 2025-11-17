@@ -1,0 +1,164 @@
+@startuml DLLM Component Diagram
+
+skinparam package {
+    BackgroundColor<<hardware>> #8B4513
+    BackgroundColor<<communication>> #FF9900
+    BackgroundColor<<lambda>> #FF9900
+    BackgroundColor<<storage>> #146EB4
+    BackgroundColor<<ml>> #4A90E2
+    BackgroundColor<<frontend>> #00D9FF
+    BackgroundColor<<infra>> #FF9900
+}
+
+package "Hardware Layer" <<hardware>> {
+    component [Arduino Washer] as ArduinoWasher
+    component [Arduino Dryer] as ArduinoDryer
+    component [ESP32 Camera] as ESP32Camera
+    
+    note right of ArduinoWasher
+        IMU Sensor
+        Random Forest Classifier
+        Vibration Detection
+    end note
+    
+    note right of ArduinoDryer
+        IMU Sensor
+        Random Forest Classifier
+        Vibration Detection
+    end note
+    
+    note right of ESP32Camera
+        Camera Module
+        Image Capture
+        WiFi Communication
+    end note
+}
+
+package "Communication Layer" <<communication>> {
+    component [MQTT Broker] as MQTTBroker
+    component [AWS IoT Core] as IoTCore
+    
+    note right of IoTCore
+        IoT Topic Rules:
+        - laundry/vibration
+        - laundry/camera
+        - laundry/button
+    end note
+}
+
+package "AWS Lambda Functions" <<lambda>> {
+    component [storeDataFunction] as StoreData
+    component [processCameraDataFunction] as ProcessCamera
+    component [updateMachineStateFunction] as UpdateState
+    component [postCameraImageJSONFunction] as PostCamera
+    component [fetchMachineStatusFunction] as FetchStatus
+    component [seedMachineFunction] as SeedMachine
+    component [shuffleMachineStatus] as ShuffleStatus
+    component [connectFunction] as ConnectWS
+    component [disconnectFunction] as DisconnectWS
+    component [archiveOldDataFunction] as ArchiveData
+    
+    note right of UpdateState
+        State Machine:
+        - available
+        - loading
+        - in-use
+        - finishing
+        - ready-to-unload
+    end note
+}
+
+package "Storage Layer" <<storage>> {
+    database "MachineStatusTable" as MachineStatus
+    database "VibrationData" as VibrationData
+    database "CameraDetectionData" as CameraDetection
+    database "CameraImageJSON" as CameraImage
+    database "WebSocketConnections" as WSConnections
+    storage "S3 Bucket\n(Archived Data)" as S3Archive
+}
+
+package "ML/AI Layer" <<ml>> {
+    component [YOLOv7\nPose Detection] as YOLOv7
+    component [Decision Tree\nTask Classification] as DecisionTree
+    component [Random Forest\nVibration Classifier] as RandomForest
+    
+    note right of YOLOv7
+        Detects human poses
+        Filters by angle thresholds
+    end note
+    
+    note right of DecisionTree
+        Classifies:
+        - Washer access
+        - Dryer access
+        - Walking/Passing
+    end note
+}
+
+package "Frontend Layer" <<frontend>> {
+    component [Web Application\n(Vercel)] as WebApp
+    
+    note right of WebApp
+        Real-time status display
+        Polls every 5 minutes
+        WebSocket support
+    end note
+}
+
+package "Infrastructure" <<infra>> {
+    component [Terraform] as Terraform
+    component [CloudWatch] as CloudWatch
+    component [API Gateway] as APIGateway
+}
+
+' Hardware to Communication
+ArduinoWasher --> MQTTBroker : MQTT\n(vibration data)
+ArduinoDryer --> MQTTBroker : MQTT\n(vibration data)
+ESP32Camera --> PostCamera : HTTP POST\n(image JSON)
+
+' Communication to AWS
+MQTTBroker --> IoTCore : Forward messages
+IoTCore --> StoreData : IoT Rule\n(laundry/vibration)
+IoTCore --> ProcessCamera : IoT Rule\n(laundry/camera)
+IoTCore --> ShuffleStatus : IoT Rule\n(laundry/button)
+
+' Lambda function interactions
+StoreData --> VibrationData : Store data
+StoreData --> UpdateState : Invoke\n(sensor fusion)
+ProcessCamera --> CameraDetection : Store detection
+ProcessCamera --> UpdateState : Invoke\n(sensor fusion)
+UpdateState --> MachineStatus : Update state
+PostCamera --> CameraImage : Store image JSON
+FetchStatus --> MachineStatus : Query status
+SeedMachine --> MachineStatus : Initialize machines
+ArchiveData --> VibrationData : Read old data
+ArchiveData --> S3Archive : Archive data
+ConnectWS --> WSConnections : Store connection
+DisconnectWS --> WSConnections : Remove connection
+
+' ML Processing
+CameraImage --> YOLOv7 : Process images
+YOLOv7 --> DecisionTree : Pose data
+DecisionTree --> ProcessCamera : Classification result
+ArduinoWasher --> RandomForest : Local inference
+ArduinoDryer --> RandomForest : Local inference
+
+' Frontend connections
+WebApp --> FetchStatus : HTTP GET\n(every 5 min)
+WebApp --> APIGateway : WebSocket
+APIGateway --> ConnectWS : On connect
+APIGateway --> DisconnectWS : On disconnect
+
+' Infrastructure
+Terraform ..> StoreData : Manages
+Terraform ..> ProcessCamera : Manages
+Terraform ..> UpdateState : Manages
+Terraform ..> MachineStatus : Manages
+Terraform ..> VibrationData : Manages
+Terraform ..> CameraDetection : Manages
+CloudWatch ..> StoreData : Monitors
+CloudWatch ..> ProcessCamera : Monitors
+CloudWatch ..> UpdateState : Monitors
+
+@enduml
+
