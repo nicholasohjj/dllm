@@ -52,6 +52,7 @@ describe("storeDataFunction handler", () => {
           Item: expect.objectContaining({
             machine_id: "RVREB-W1",
             vibration: 1,
+            timestamp_value: expect.any(String),
           }),
         }),
       })
@@ -63,6 +64,7 @@ describe("storeDataFunction handler", () => {
         input: expect.objectContaining({
           FunctionName: "updateMachineStateFunction",
           InvocationType: "Event",
+          Payload: expect.stringContaining('"timestamp_value"'),
         }),
       })
     );
@@ -82,5 +84,4 @@ describe("storeDataFunction handler", () => {
     expect(lambdaSendMock).toHaveBeenCalledTimes(1);
   });
 });
-
 

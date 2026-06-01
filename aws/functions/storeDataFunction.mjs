@@ -5,20 +5,24 @@ import { LambdaClient, InvokeCommand } from "@aws-sdk/client-lambda";
 const dynamoClient = new DynamoDBClient({});
 const ddbDocClient = DynamoDBDocumentClient.from(dynamoClient);
 const lambdaClient = new LambdaClient({});
+const toIsoSeconds = (date) => date.toISOString().replace(/\.\d{3}Z$/, "Z");
 
 export const handler = async (event) => {
   console.log("Received vibration event:", JSON.stringify(event));
   
   const tableName = process.env.DYNAMODB_TABLE;
   const stateMachineFunctionName = process.env.STATE_MACHINE_FUNCTION || "updateMachineStateFunction";
+  const eventTimestamp = event.timestamp ?? Date.now() / 1000;
+  const normalizedEvent = {
+    ...event,
+    timestamp: eventTimestamp,
+    timestamp_value: event.timestamp_value || toIsoSeconds(new Date())
+  };
 
   // Structure the event data to fit the DynamoDB table's schema
   const params = {
     TableName: tableName,
-    Item: {
-      ...event,
-      timestamp: event.timestamp || Date.now() / 1000
-    },
+    Item: normalizedEvent,
   };
 
   try {
@@ -28,7 +32,7 @@ export const handler = async (event) => {
     // Invoke state machine function to process the event
     const stateMachinePayload = {
       source: "imu",
-      data: event
+      data: normalizedEvent
     };
     
     const invokeParams = {

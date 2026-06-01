@@ -20,7 +20,7 @@ def lambda_handler(event, context):
     print(f"Received event: {json.dumps(event)}")
     
     source = event.get('source')  # 'camera' or 'imu'
-    data = event.get('data')
+    data = event.get('data') or {}
     machine_id = data.get('machine_id')
     
     if not machine_id:
@@ -38,7 +38,7 @@ def lambda_handler(event, context):
     
     # Process event based on source
     if source == 'camera':
-        new_state = process_camera_event(machine_id, data, current_state, camera_table)
+        new_state = process_camera_event(machine_id, data, current_state, camera_table, machine_status_table)
     elif source == 'imu':
         new_state = process_imu_event(machine_id, data, current_state, camera_table, machine_status_table)
     else:
@@ -71,7 +71,7 @@ def get_machine_state(table, machine_id):
         print(f"Error getting machine state: {e}")
         return STATE_AVAILABLE
 
-def process_camera_event(machine_id, data, current_state, camera_table):
+def process_camera_event(machine_id, data, current_state, camera_table, machine_status_table):
     """
     Process camera detection event
     """
@@ -105,7 +105,7 @@ def process_camera_event(machine_id, data, current_state, camera_table):
         
         elif current_state == STATE_IN_USE:
             # Check if machine has been running long enough
-            state_duration = get_state_duration(machine_id)
+            state_duration = get_state_duration(machine_status_table, machine_id)
             
             # Typical wash cycle: 30-60 min, dryer: 45-90 min
             device_type = data.get('device_type', 'washer')
@@ -122,8 +122,12 @@ def process_imu_event(machine_id, data, current_state, camera_table, machine_sta
     """
     Process IMU vibration event with sensor fusion
     """
-    is_spinning = data.get('is_spinning', 0)
-    confidence = data.get('confidence', 0)
+    is_spinning = data.get('is_spinning', data.get('vibration', 0))
+    confidence = data.get('confidence')
+    if confidence is None:
+        confidence = 1 if 'vibration' in data else 0
+    elif is_spinning == 0:
+        confidence = max(confidence, 1 - confidence)
     
     # Low confidence - ignore
     if confidence < 0.5:
@@ -246,4 +250,3 @@ def update_machine_state(table, machine_id, new_state, event_data, source):
     except Exception as e:
         print(f"Error updating machine state: {e}")
         raise
-

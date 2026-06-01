@@ -161,8 +161,8 @@ resource "aws_lambda_function" "archiveOldDataFunction" {
   environment {
     variables = {
       VIBRATION_DATA_TABLE  = aws_dynamodb_table.VibrationData.name
-      ARCHIVE_BUCKET_NAME   = "archived-data-dllm"  # Define your S3 bucket name
-      ARCHIVE_S3_KEY        = "archive/oldData.json"  # Define your S3 key path
+      ARCHIVE_BUCKET_NAME   = aws_s3_bucket.archived_data.bucket
+      ARCHIVE_S3_KEY        = "archive/oldData.json"
     }
   }
 }
@@ -181,6 +181,7 @@ resource "aws_lambda_function" "postCameraImageJSONFunction" {
   environment {
     variables = {
       CAMERA_IMAGE_JSON_TABLE = aws_dynamodb_table.CameraImageJSON.name
+      MACHINE_STATUS_TABLE    = aws_dynamodb_table.MachineStatusTable.name
     }
   }
 }
@@ -196,7 +197,7 @@ resource "aws_lambda_function" "storeDataFunction" {
 
   environment {
     variables = {
-      DYNAMODB_TABLE       = "VibrationData"
+      DYNAMODB_TABLE         = aws_dynamodb_table.VibrationData.name
       STATE_MACHINE_FUNCTION = aws_lambda_function.updateMachineStateFunction.function_name
     }
   }
@@ -289,4 +290,3 @@ resource "aws_lambda_function" "updateMachineStateFunction" {
     }
   }
 }
-

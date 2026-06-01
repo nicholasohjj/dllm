@@ -104,16 +104,34 @@ resource "aws_iam_policy" "archive_data_policy" {
       {
         "Effect": "Allow",
         "Action": [
+          "s3:GetObject",
           "s3:PutObject"
         ],
-        "Resource": "arn:aws:s3:::archived-data-dllm/archive/*"  # Ensure bucket name and path are correct here
+        "Resource": "${aws_s3_bucket.archived_data.arn}/archive/*"
       },
       {
         "Effect": "Allow",
         "Action": [
           "s3:ListBucket"
         ],
-        "Resource": "arn:aws:s3:::archived-data-dllm"  # Allow list operation at bucket level
+        "Resource": aws_s3_bucket.archived_data.arn
+      },
+      {
+        "Effect": "Allow",
+        "Action": [
+          "dynamodb:Scan",
+          "dynamodb:DeleteItem"
+        ],
+        "Resource": aws_dynamodb_table.VibrationData.arn
+      },
+      {
+        "Effect": "Allow",
+        "Action": [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        "Resource": "arn:aws:logs:*:*:*"
       }
     ]
   })
