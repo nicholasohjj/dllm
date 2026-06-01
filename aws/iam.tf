@@ -78,6 +78,38 @@ resource "aws_iam_role" "modifyWebConnectionsRole" {
   path = "/service-role/"
 }
 
+resource "aws_iam_policy" "websocket_connections_policy" {
+  name        = "WebSocketConnectionsPolicy"
+  description = "Allow WebSocket connect and disconnect handlers to manage connection records"
+  policy = jsonencode({
+    "Version" : "2012-10-17",
+    "Statement" : [
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "dynamodb:PutItem",
+          "dynamodb:DeleteItem"
+        ],
+        "Resource" : aws_dynamodb_table.WebSocketConnections.arn
+      },
+      {
+        "Effect" : "Allow",
+        "Action" : [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ],
+        "Resource" : "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "websocket_connections_role_attach" {
+  role       = aws_iam_role.modifyWebConnectionsRole.name
+  policy_arn = aws_iam_policy.websocket_connections_policy.arn
+}
+
 resource "aws_iam_role" "archiveOldDataRole" {
   name = "archiveOldDataRole"
   assume_role_policy = jsonencode({
